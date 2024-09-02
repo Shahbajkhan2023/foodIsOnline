@@ -1,6 +1,7 @@
 from pathlib import Path
 from decouple import config
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
@@ -17,6 +18,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    'accounts',
 ]
 
 MIDDLEWARE = [
@@ -60,6 +63,8 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = 'accounts.User'
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -89,5 +94,10 @@ STATIC_ROOT = BASE_DIR/'static'
 STATICFILES_DIRS = [
     'foodOnline_main/static',
 ]
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR/'media'
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
