@@ -10,7 +10,7 @@ from .utils import detectUser, send_verification_email
 from django.contrib.auth.decorators import login_required, user_passes_test
 
 from django.core.exceptions import PermissionDenied
-
+from vendor.models import Vendor
 
 # Restrict the vendor from accessing the customer page
 def check_role_vendor(user):
@@ -81,7 +81,7 @@ def registerVendor(request):
     elif request.method == 'POST':
         # store the data and create the user
         form = UserForm(request.POST)
-        v_form = registerVendor(request.POST, request.FILES)
+        v_form = VendorForm(request.POST, request.FILES)
         if form.is_valid() and v_form.is_valid:
             first_name = form.cleaned_data['first_name']
             last_name = form.cleaned_data['last_name']
@@ -91,6 +91,11 @@ def registerVendor(request):
             user = User.objects.create_user(first_name=first_name, last_name=last_name, username=username, email=email, password=password)
             user.role = User.VENDOR
             user.save()
+            vendor = v_form.save(commit=False)
+            vendor.user = user
+            user_profile = UserProfile.objects.get(user=user)
+            vendor.user_profile = user_profile
+            vendor.save()
             vendor = v_form.save(commit=False)
             vendor.user = user
             user_profile = UserProfile.objects.get(user=user)
@@ -134,6 +139,7 @@ def activate(request, uidb64, token):
         messages.error(request, 'Invalid activation link')
         return redirect('myAccount')
     
+
 def login(request):
     if request.user.is_authenticated:
         messages.warning(request, 'You are already logged in!')
