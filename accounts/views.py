@@ -90,12 +90,6 @@ def registerVendor(request):
             password = form.cleaned_data['password']
             user = User.objects.create_user(first_name=first_name, last_name=last_name, username=username, email=email, password=password)
             user.role = User.VENDOR
-            user.save()
-            vendor = v_form.save(commit=False)
-            vendor.user = user
-            user_profile = UserProfile.objects.get(user=user)
-            vendor.user_profile = user_profile
-            vendor.save()
             vendor = v_form.save(commit=False)
             vendor.user = user
             user_profile = UserProfile.objects.get(user=user)
