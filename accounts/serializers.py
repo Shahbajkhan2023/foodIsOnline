@@ -62,3 +62,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'latitude': {'required': False},
             'longitude': {'required': False},
         }
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(style={'input_type': 'password'})
+
