@@ -68,3 +68,22 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(style={'input_type': 'password'})
 
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(source='userprofile', read_only=True)
+    
+    # Import VendorSerializer only inside this class to avoid circular import
+    def get_vendor(self, obj):
+        from vendor.serializers import VendorSerializer  # Import here to avoid circular import
+        if hasattr(obj, 'vendor'):
+            return VendorSerializer(obj.vendor).data
+        return None
+
+    vendor = serializers.SerializerMethodField('get_vendor')
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'first_name', 'last_name', 'username', 'email', 'phone_number',
+            'role', 'profile', 'vendor'
+        ]

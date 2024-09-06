@@ -26,4 +26,5 @@ urlpatterns = [
     path('api_register-vendor/', api_views.RegisterVendorView.as_view(), name='register_vendor'),
     path('api_login/', api_views.LoginView.as_view(), name='api_login'),
     path('api_logout/', api_views.LogoutView.as_view(), name='api_logout'),
+    path('api_user-details/', api_views.UserDetailView.as_view(), name='user-details'),
 ]

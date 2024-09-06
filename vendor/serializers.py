@@ -14,3 +14,5 @@ class VendorSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_profile', 'vendor_name', 'vendor_license', 'is_approved', 
             'created_at', 'modified_at'
         ]
+
+

@@ -7,6 +7,9 @@ from vendor.serializers import VendorSerializer
 from vendor.models import Vendor
 from django.contrib.auth import authenticate, login as auth_login , logout as auth_logout
 from rest_framework.authtoken.models import Token
+from rest_framework. exceptions import PermissionDenied
+from .serializers import UserDetailSerializer
+from rest_framework.permissions import IsAuthenticated
 
 
 class RegisterUserView(APIView):
@@ -79,3 +82,35 @@ class LogoutView(APIView):
         request.user.auth_token.delete()  # Delete the current user's token
         auth_logout(request)
         return Response({'message': 'You are logged out.'}, status=status.HTTP_200_OK)
+    
+
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        
+        # Use UserDetailSerializer to get complete user details
+        serializer = UserDetailSerializer(user)
+
+        # Filter details based on user role
+        if user.role == User.VENDOR:
+            # Return vendor-specific information
+            vendor = Vendor.objects.filter(user=user).first()
+            if vendor:
+                vendor_serializer = VendorSerializer(vendor)
+                return Response({
+                    'user': serializer.data,
+                    'vendor': vendor_serializer.data
+                }, status=status.HTTP_200_OK)
+            else:
+                raise PermissionDenied("Vendor details not found.")
+
+        elif user.role == User.CUSTOMER:
+            # Return customer-specific information
+            return Response({
+                'user': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        else:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
