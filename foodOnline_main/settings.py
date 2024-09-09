@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     # django_app
     'accounts',
     'vendor',
+    'menu',
 ]
 
 MIDDLEWARE = [
