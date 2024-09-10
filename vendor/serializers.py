@@ -41,8 +41,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # User fields update karein
         for attr, value in validated_data.items():
-            if hasattr(instance, attr):
-                setattr(instance, attr, value)
+            if hasattr(instance, attr): # Check karta hai ki User instance me attribute hai ya nahi.
+                setattr(instance, attr, value) # User instance ke attribute ko update karta hai.
 
         # UserProfile handle karein
         user_profile_data = {
