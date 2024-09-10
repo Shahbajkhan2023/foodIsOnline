@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from accounts import views as AccountViews
+from . import api_views
 
 
 urlpatterns = [
@@ -13,5 +14,8 @@ urlpatterns = [
     path('menu-builder/category/add/', views.add_category, name='add_category'),
     path('menu-builder/category/edit/<int:pk>/', views.edit_category, name='edit_category'),
     path('menu-builder/category/delete/<int:pk>/', views.delete_category, name='delete_category'),
+
+    # api_views
+    path('users/update/', api_views.update_user, name='update_user'),
 
 ]

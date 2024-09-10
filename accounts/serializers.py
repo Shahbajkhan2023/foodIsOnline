@@ -48,14 +48,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = [
-            'profile_picture', 'cover_photo', 'address_line_1', 'address_line_2',
+            'profile_picture', 'cover_photo', 'address',
             'country', 'state', 'city', 'pin_code', 'latitude', 'longitude'
         ]
         extra_kwargs = {
             'profile_picture': {'required': False},
             'cover_photo': {'required': False},
-            'address_line_1': {'required': False},
-            'address_line_2': {'required': False},
+            'address': {'required': False},
             'country': {'required': False},
             'state': {'required': False},
             'city': {'required': False},
