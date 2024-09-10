@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User, UserProfile
+from rest_framework.authtoken.models import Token
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -87,3 +88,43 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'id', 'first_name', 'last_name', 'username', 'email', 'phone_number',
             'role', 'profile', 'vendor'
         ]
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+    
+    def validate(self, data):
+        email = data.get('email')
+        token_key = data.get('token')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+        
+        if new_password != confirm_password:
+            raise serializers.ValidationError({"confirm_password": "Passwords must match"})
+        
+        # Check if the user exists
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User with this email does not exist"})
+        
+        # Validate the token
+        try:
+            token = Token.objects.get(key=token_key, user=user)
+        except Token.DoesNotExist:
+            raise serializers.ValidationError({"token": "Invalid or expired token"})
+        
+        return data
+    
+    def save(self):
+        email = self.validated_data['email']
+        new_password = self.validated_data['new_password']
+        
+        user = User.objects.get(email=email)
+        user.set_password(new_password)
+        user.save()
+        
+        return user

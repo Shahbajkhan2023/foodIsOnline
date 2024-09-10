@@ -10,6 +10,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework. exceptions import PermissionDenied
 from .serializers import UserDetailSerializer
 from rest_framework.permissions import IsAuthenticated
+from .serializers import PasswordResetSerializer
 
 
 class RegisterUserView(APIView):
@@ -114,3 +115,12 @@ class UserDetailView(APIView):
 
         else:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+
+class PasswordResetView(APIView):
+    def post(self, request):
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({"success": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
