@@ -21,7 +21,12 @@ urlpatterns = [
     path('menu-builder/food/delete/<int:pk>/', views.delete_food, name='delete_food'),
 
     # api_views
+    # category_api_view
     path('users/update/', api_views.UpdateUserView.as_view(), name='update_user'),
-    path('fooditems/', api_views.VendorFoodItemsByCategoryView.as_view(), name='vendor-fooditems-by-category'),
-    path('fooditems/<slug:slug>/', api_views.VendorFoodItemsByCategoryView.as_view(), name='category-detail-update-delete'),
+    path('fooditemsbycategory/', api_views.VendorFoodItemsByCategoryView.as_view(), name='vendor-fooditems-by-category'),
+    path('fooditemsbycategory/<slug:slug>/', api_views.VendorFoodItemsByCategoryView.as_view(), name='category-detail-update-delete'),
+
+    path('food/add/', api_views.FoodItemView.as_view(), name='food_item_create'),
+    path('food/update/<slug:slug>/',  api_views.FoodItemView.as_view(), name='food_item_update'),
+    path('food/delete/<slug:slug>/',  api_views.FoodItemView.as_view(), name='food_item_delete'),
 ]

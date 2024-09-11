@@ -5,12 +5,12 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from .drf_custome_permission.permissions import IsVendor
 from menu.models import Category, FoodItem
-from menu.serializers import CategorySerializer, FoodItemSerializer
+from menu.serializers import CategorySerializer, FoodItemSerializer, FoodItemCreateSerializer
 from .models import Vendor
-from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
 
 from .serializers import UserUpdateSerializer
+
 
 
 class UpdateUserView(APIView):
@@ -109,3 +109,18 @@ class VendorFoodItemsByCategoryView(APIView):
 
 
 
+class FoodItemView(APIView):
+    permission_classes = [IsAuthenticated, IsVendor]
+
+    def post(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'vendor'):
+            return Response({"detail": "You do not have permission to add food items."}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = FoodItemCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except serializer.ValidationError as e:
+                return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
