@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 
 from menu.models import Category, FoodItem
@@ -8,6 +8,8 @@ from vendor.models import Vendor
 
 from .context_processors import get_cart_amounts, get_cart_counter
 from .models import Cart
+from django.shortcuts import render
+from accounts.models import UserProfile
 
 
 def marketplace(request):
@@ -161,3 +163,35 @@ def delete_cart(request, cart_id):
                 )
         else:
             return JsonResponse({"status": "Failed", "message": "Invalid request!"})
+
+
+def search(request):
+    # Get search parameters from the request
+    keyword = request.GET.get('keyword', '').strip()
+    address = request.GET.get('address', '').strip()
+
+    # Start with the basic Vendor queryset
+    vendors = Vendor.objects.all()
+
+    # Filter vendors by vendor_name if provided
+    if keyword:
+        vendors = vendors.filter(vendor_name__icontains=keyword)
+
+    # Filter vendors by location if provided
+    if address:
+        # Ensure UserProfile with matching location is fetched
+        matching_profiles = UserProfile.objects.filter(location__icontains=address)
+        vendors = vendors.filter(user_profile__in=matching_profiles)
+
+    # Get the count of vendors
+    vendor_count = vendors.count()
+
+    # Prepare context for the template
+    context = {
+        'vendors': vendors,
+        'vendor_count': vendor_count,
+        'source_location': address,
+    }
+
+    # Render the results in the template
+    return render(request, 'marketplace/listings.html', context)

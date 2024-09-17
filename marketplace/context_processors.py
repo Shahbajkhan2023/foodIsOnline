@@ -1,5 +1,4 @@
 from menu.models import FoodItem
-
 from .models import Cart
 
 
