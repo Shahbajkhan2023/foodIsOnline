@@ -9,8 +9,8 @@ from accounts.views import check_role_vendor
 from menu.forms import CategoryForm, FoodItemForm
 from menu.models import Category, FoodItem
 
-from .forms import VendorForm
-from .models import Vendor
+from .forms import VendorForm, OpeningHourForm
+from .models import Vendor, OpeningHour
 
 
 def get_vendor(request):
@@ -192,3 +192,13 @@ def delete_food(request, pk=None):
     food.delete()
     messages.success(request, "Food Item has been deleted successfully!")
     return redirect("fooditems_by_category", food.category.id)
+
+
+def opening_hours(request):
+    opening_hours = OpeningHour.objects.filter(vendor=get_vendor(request))
+    form = OpeningHourForm()
+    context = {
+        'form': form,
+        'opening_hours': opening_hours,
+    }
+    return render(request, 'vendor/opening_hours.html', context)
