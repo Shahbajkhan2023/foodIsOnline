@@ -32,6 +32,7 @@ urlpatterns = [
     # Opening Hour CRUD
     path('opening-hours/', views.OpeningHoursView.as_view(), name='opening_hours'),
     path('opening-hours/add/', views.AddOpeningHoursView.as_view(), name='add_opening_hours'),
+    path('opening-hours/remove/<int:pk>/', views.RemoveOpeningHoursView.as_view(), name='remove_opening_hours'),
     
     # api_views
     path("users/update/", api_views.UpdateUserView.as_view(), name="update_user"),
