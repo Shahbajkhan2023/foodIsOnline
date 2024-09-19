@@ -14,6 +14,10 @@ from menu.models import Category, FoodItem
 from .forms import VendorForm, OpeningHourForm
 from .models import Vendor, OpeningHour
 
+from django.views.generic import ListView
+from django.views.generic.edit import CreateView
+from .mixins import AjaxAuthenticationMixin
+
 
 def get_vendor(request):
     vendor = Vendor.objects.get(user=request.user)
@@ -196,51 +200,45 @@ def delete_food(request, pk=None):
     return redirect("fooditems_by_category", food.category.id)
 
 
-def opening_hours(request):
-    opening_hours = OpeningHour.objects.filter(vendor=get_vendor(request))
-    form = OpeningHourForm()
-    context = {
-        'form': form,
-        'opening_hours': opening_hours,
-    }
-    return render(request, 'vendor/opening_hours.html', context)
+class OpeningHoursView(ListView):
+    model = OpeningHour
+    template_name = 'vendor/opening_hours.html'
+    context_object_name = 'opening_hours'
+
+    def get_queryset(self):
+        return OpeningHour.objects.filter(vendor=get_vendor(self.request))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = OpeningHourForm()
+        return context
 
 
-def add_opening_hours(request):
-     if request.user.is_authenticated:
-        if (request.headers.get('x-requested-with') == 'XMLHttpRequest' 
-            and request.method == 'POST'):
-            day = request.POST.get('day')
-            from_hour = request.POST.get('from_hour')
-            to_hour = request.POST.get('to_hour')
-            is_closed = request.POST.get('is_closed')
-            try:
-                hour = OpeningHour.objects.create(
-                    vendor=get_vendor(request), 
-                    day=day, 
-                    from_hour=from_hour, 
-                    to_hour=to_hour, 
-                    is_closed=is_closed)
-                if hour:
-                    day = OpeningHour.objects.get(id=hour.id)
-                    if day.is_closed:
-                        response = {
-                            'status': 'success', 
-                            'id': hour.id, 
-                            'day': day.get_day_display(),
-                            'is_closed': 'Closed'}
-                    else:
-                        response = {
-                            'status': 'success', 
-                            'id': hour.id, 
-                            'day': day.get_day_display(), 
-                            'from_hour': hour.from_hour, 
-                            'to_hour': hour.to_hour}
-                return JsonResponse(response)
-            except IntegrityError as e:
-                response = {
-                    'status': 'failed',
-                    'message': from_hour+'-'+to_hour+' already exists for this day!'}
-                return JsonResponse(response)
-        else:
-            HttpResponse('Invalid request')
+class AddOpeningHoursView(AjaxAuthenticationMixin, CreateView):
+    model = OpeningHour
+    form_class = OpeningHourForm
+
+    def form_valid(self, form):
+        form.instance.vendor = get_vendor(self.request)
+
+        try:
+            opening_hour = form.save()
+            return JsonResponse(self.success_response(opening_hour))
+        except IntegrityError:
+            return JsonResponse(self.error_response(form), status=400)
+
+    def success_response(self, opening_hour):
+        return {
+            'status': 'success',
+            'id': opening_hour.id,
+            'day': opening_hour.get_day_display(),
+            'is_closed': 'Closed' if opening_hour.is_closed else None,
+            'from_hour': opening_hour.from_hour if not opening_hour.is_closed else None,
+            'to_hour': opening_hour.to_hour if not opening_hour.is_closed else None,
+        }
+
+    def error_response(self, form):
+        return {
+            'status': 'failed',
+            'message': f"{form.cleaned_data['from_hour']}-{form.cleaned_data['to_hour']} already exists for this day!"
+        }
