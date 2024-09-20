@@ -245,7 +245,7 @@ class AddOpeningHoursView(AjaxAuthenticationMixin, CreateView):
         }
     
 class RemoveOpeningHoursView(AjaxAuthenticationMixin, View):
-    def get(self, request, pk=None):
+    def get(self, request, pk):
         hour = get_object_or_404(OpeningHour, pk=pk)
         hour.delete()
         return JsonResponse({'status': 'success', 'id': pk})
