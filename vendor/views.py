@@ -14,6 +14,7 @@ from menu.models import Category, FoodItem
 from .forms import VendorForm, OpeningHourForm
 from .models import Vendor, OpeningHour
 
+from django.views import View
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView
 from .mixins import AjaxAuthenticationMixin
@@ -242,3 +243,9 @@ class AddOpeningHoursView(AjaxAuthenticationMixin, CreateView):
             'status': 'failed',
             'message': f"{form.cleaned_data['from_hour']}-{form.cleaned_data['to_hour']} already exists for this day!"
         }
+    
+class RemoveOpeningHoursView(AjaxAuthenticationMixin, View):
+    def get(self, request, pk):
+        hour = get_object_or_404(OpeningHour, pk=pk)
+        hour.delete()
+        return JsonResponse({'status': 'success', 'id': pk})
