@@ -19,6 +19,7 @@ urlpatterns = [
     ),
     path("reset_password/", views.reset_password, name="reset_password"),
     path("vendor/", include("vendor.urls")),
+    path('customer/', include('customers.urls')),
     # api_urlpattern
     path("api_register/", api_views.RegisterUserView.as_view(), name="register_user"),
     path(
