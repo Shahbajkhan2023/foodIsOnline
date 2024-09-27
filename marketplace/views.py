@@ -240,3 +240,7 @@ class CheckoutView(LoginRequiredMixin, TemplateView):
         context['form'] = OrderForm(initial=self.get_default_values())
         context['cart_items'] = cart_items
         return context
+    
+
+
+    
