@@ -138,4 +138,3 @@ class PaymentsView(LoginRequiredMixin, TemplateView):
                 amount=item.fooditem.price * item.quantity
             )
 
-    
