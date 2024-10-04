@@ -20,7 +20,7 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.views.generic import FormView
 from .forms import PasswordChangeForm
-
+from orders.models import Order
 
 # Restrict the vendor from accessing the customer page
 def check_role_vendor(user):
@@ -200,7 +200,11 @@ def myAccount(request):
 @login_required(login_url="login")
 @user_passes_test(check_role_customer)
 def custDashboard(request):
-    return render(request, "accounts/custDashboard.html")
+    recent_orders = Order.objects.filter(user=request.user, is_ordered=True).order_by('-created_at')
+    context = {
+        'recent_orders' : recent_orders,
+    }
+    return render(request, "accounts/custDashboard.html", context)
 
 
 @login_required(login_url="login")

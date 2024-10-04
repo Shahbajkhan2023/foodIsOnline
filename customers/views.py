@@ -5,6 +5,8 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from accounts.forms import UserInfoForm, UserProfileForm
 from accounts.models import UserProfile
+from orders.models import Order
+from django.views.generic import ListView, DetailView
 
 
 class CProfileView(LoginRequiredMixin, UpdateView):
@@ -35,3 +37,22 @@ class CProfileView(LoginRequiredMixin, UpdateView):
         context = self.get_context_data()
         context['user_form'] = UserInfoForm(instance=self.request.user)
         return self.render_to_response(context)
+
+
+class MyOrdersView(ListView):
+    model = Order
+    template_name = 'customers/my_orders.html'  
+    context_object_name = 'orders'  # The context variable to use in the template
+
+    def get_queryset(self):
+        # Filter the orders for the current user and only those that are ordered
+        return Order.objects.filter(user=self.request.user, is_ordered=True).order_by('-created_at')
+    
+
+class OrderDetailView(DetailView):
+    model = Order
+    template_name = 'customers/order_detail.html'  
+    context_object_name = 'order'  
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)

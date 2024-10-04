@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <h2>Order Details</h2>
+    <div class="order-details">
+        <h4>Order Number: {{ order.order_number }}</h4>
+        <p><strong>Name:</strong> {{ order.name }}</p>
+        <p><strong>Email:</strong> {{ order.email }}</p>
+        <p><strong>Phone:</strong> {{ order.phone }}</p>
+        <p><strong>Address:</strong> {{ order.address }}, {{ order.city }}, {{ order.state }}, {{ order.country }}, {{ order.pin_code }}</p>
+        <p><strong>Total Amount:</strong> ${{ order.total }}</p>
+        <p><strong>Status:</strong> {{ order.get_status_display }}</p>
+        <p><strong>Payment Method:</strong> {{ order.payment_method }}</p>
+        <h4>Ordered Items</h4>
+        <ul>
+            {% for item in order.orderedfood_set.all %}
+                <li>{{ item.fooditem.food_title }} - Quantity: {{ item.quantity }} - Price: ${{ item.price }} - Amount: ${{ item.amount }}</li>
+            {% empty %}
+                <li>No items found in this order.</li>
+            {% endfor %}
+        </ul>
+        <p><strong>Order Date:</strong> {{ order.created_at }}</p>
+    </div>
+    <a href="{% url 'my_orders' %}" class="btn btn-primary">Back to My Orders</a>
+</div>
+{% endblock %}
