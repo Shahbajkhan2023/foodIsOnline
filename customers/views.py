@@ -1,3 +1,4 @@
+from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
 from django.views.generic import UpdateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -5,7 +6,7 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from accounts.forms import UserInfoForm, UserProfileForm
 from accounts.models import UserProfile
-from orders.models import Order
+from orders.models import Order, OrderedFood
 from django.views.generic import ListView, DetailView
 
 
@@ -56,3 +57,37 @@ class OrderDetailView(DetailView):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
+
+
+class VendorOrdersView(LoginRequiredMixin, ListView):
+    model = Order
+    template_name = 'vendor/vendor_orders.html'
+    context_object_name = 'orders'
+    login_url = 'login'
+
+    def get_queryset(self):
+        # Fetch the current vendor
+        current_vendor = self.request.user.user  # Assuming the user has a OneToOne relationship with Vendor
+        return Order.objects.filter(vendor=current_vendor).order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        # Add vendor information to the context
+        context = super().get_context_data(**kwargs)
+        context['vendor'] = self.request.user.user  # Assuming user has OneToOne relation with Vendor
+        return context
+    
+
+class VendorOrderDetailView(LoginRequiredMixin, DetailView):
+    model = Order
+    template_name =  'vendor/vendor_order_detail.html'
+    context_object_name = 'order'
+    login_url = 'login'
+
+    def get_queryset(self):
+        current_vendor = self.request.user.user
+        return Order.objects.filter(vendor=current_vendor)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ordered_food_items'] = OrderedFood.objects.filter(order=self.object)
+        return context
