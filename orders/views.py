@@ -61,12 +61,22 @@ class PlaceOrderView(LoginRequiredMixin, FormView):
             tax_data=tax_data,
             total_tax=amounts['tax'],
             payment_method=self.request.POST['payment_method'],
+            vendor=self.get_vendor(),
             **form.cleaned_data
         )
         order.order_number = generate_order_number(order.id)
         order.save()  # Update order number
-        return order
 
+        return order
+    
+    def get_vendor(self):
+        """Fetch the vendor associated with the user's cart items."""
+        # Example logic to get the vendor, adjust as needed
+        cart_items = Cart.objects.filter(user=self.request.user)
+        if cart_items.exists():
+            return cart_items.first().fooditem.vendor  # Assuming all items have the same vendor
+        return None
+    
 
 class PaymentsView(LoginRequiredMixin, TemplateView):
     login_url = 'login'  # Redirect to login if not authenticated
@@ -135,6 +145,9 @@ class PaymentsView(LoginRequiredMixin, TemplateView):
                 fooditem=item.fooditem,
                 quantity=item.quantity,
                 price=item.fooditem.price,
-                amount=item.fooditem.price * item.quantity
+                amount=item.fooditem.price * item.quantity,
+                vendor=item.fooditem.vendor
             )
+
+        cart_items.delete()
 

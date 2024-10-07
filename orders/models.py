@@ -1,6 +1,7 @@
 from django.db import models
 from accounts.models import User
 from menu.models import FoodItem
+from vendor.models import Vendor
 
 
 class Payment(models.Model):
@@ -46,6 +47,10 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
+    # New field to link to Vendor
+    vendor = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True)
+
     # Concatenate first name and last name
     @property
     def name(self):
@@ -66,5 +71,8 @@ class OrderedFood(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # New field to link to Vendor
+    vendor = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True)
+
     def __str__(self):
         return self.fooditem.food_title
