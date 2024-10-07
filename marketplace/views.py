@@ -10,6 +10,10 @@ from .context_processors import get_cart_amounts, get_cart_counter
 from .models import Cart
 from django.shortcuts import render
 from accounts.models import UserProfile
+from django.views.generic import TemplateView
+from django.shortcuts import redirect
+from django.contrib.auth.mixins import LoginRequiredMixin
+from orders.forms import OrderForm
 
 
 def marketplace(request):
@@ -43,7 +47,7 @@ def vendor_detail(request, vendor_slug):
 
 def add_to_cart(request, food_id):
     if request.user.is_authenticated:
-        if request.is_ajax():
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             # Check if the food item exists
             try:
                 fooditem = FoodItem.objects.get(id=food_id)
@@ -90,7 +94,7 @@ def add_to_cart(request, food_id):
 
 def decrease_cart(request, food_id):
     if request.user.is_authenticated:
-        if request.is_ajax():
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             # Check if the food item exists
             try:
                 fooditem = FoodItem.objects.get(id=food_id)
@@ -143,7 +147,7 @@ def cart(request):
 
 def delete_cart(request, cart_id):
     if request.user.is_authenticated:
-        if request.is_ajax():
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             try:
                 # Check if the cart item exists
                 cart_item = Cart.objects.get(user=request.user, id=cart_id)
@@ -195,3 +199,48 @@ def search(request):
 
     # Render the results in the template
     return render(request, 'marketplace/listings.html', context)
+
+
+class CheckoutView(LoginRequiredMixin, TemplateView):
+    login_url = 'login'  # Redirect to login page if not authenticated
+    template_name = 'marketplace/checkout.html'  # Template to render
+
+    def get_cart_items(self):
+        """Retrieve cart items for the logged-in user."""
+        return Cart.objects.filter(user=self.request.user).order_by('created_at')
+
+    def get_user_profile(self):
+        """Get user profile details for the logged-in user."""
+        return UserProfile.objects.get(user=self.request.user)
+
+    def get_default_values(self):
+        """Prepare default values for the order form."""
+        user_profile = self.get_user_profile()
+        return {
+            'first_name': self.request.user.first_name,
+            'last_name': self.request.user.last_name,
+            'phone': self.request.user.phone_number,
+            'email': self.request.user.email,
+            'address': user_profile.address,
+            'country': user_profile.country,
+            'state': user_profile.state,
+            'city': user_profile.city,
+            'pin_code': user_profile.pin_code,
+        }
+
+    def get_context_data(self, **kwargs):
+        """Add context data to the template."""
+        context = super().get_context_data(**kwargs)
+        cart_items = self.get_cart_items()
+        cart_count = cart_items.count()
+
+        if cart_count <= 0:
+            return redirect('marketplace')  # Redirect if cart is empty
+
+        context['form'] = OrderForm(initial=self.get_default_values())
+        context['cart_items'] = cart_items
+        return context
+    
+
+
+    

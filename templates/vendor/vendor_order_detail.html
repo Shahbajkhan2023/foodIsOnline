@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+{% include 'includes/alerts.html' %}
+
+<!-- Order Detail Section Start -->
+<div class="order-detail-section">
+    <div class="container">
+        <h2 class="text-uppercase">Order Details for Order Number: {{ order.order_number }}</h2>
+
+        <table class="table table-bordered">
+            <tr>
+                <th>Total Amount</th>
+                <td>${{ order.total }}</td>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <td>{{ order.is_ordered|yesno:"Ordered,Pending" }}</td>
+            </tr>
+            <tr>
+                <th>Customer Name</th>
+                <td>{{ order.user.first_name }} {{ order.user.last_name }}</td>
+            </tr>
+            <tr>
+                <th>Date</th>
+                <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            <tr>
+                <th>Payment Method</th>
+                <td>{{ order.payment_method }}</td>
+            </tr>
+            <tr>
+                <th>Ordered Food Items</th>
+                <td>
+                    <ul>
+                        {% for ordered_item in ordered_food_items %}
+                            <li>
+                                {{ ordered_item.fooditem.food_title }} - Quantity: {{ ordered_item.quantity }} - Price: ${{ ordered_item.price }}
+                            </li>
+                        {% empty %}
+                            <li>No food items in this order.</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+        </table>
+
+        <a href="{% url 'vendor_orders' %}" class="btn btn-secondary">Back to Orders</a>
+    </div>
+</div>
+<!-- Order Detail Section End -->
+
+{% endblock %}
