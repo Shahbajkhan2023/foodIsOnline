@@ -18,7 +18,9 @@ urlpatterns = [
         name="reset_password_validate",
     ),
     path("reset_password/", views.reset_password, name="reset_password"),
+    path('change-password/', views.PasswordChangeView.as_view(), name='password_change'),
     path("vendor/", include("vendor.urls")),
+    path('customer/', include('customers.urls')),
     # api_urlpattern
     path("api_register/", api_views.RegisterUserView.as_view(), name="register_user"),
     path(

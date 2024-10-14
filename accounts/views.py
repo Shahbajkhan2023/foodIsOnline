@@ -14,6 +14,13 @@ from .forms import UserForm
 from .models import User, UserProfile
 from .utils import detectUser, send_verification_email
 
+from django.urls import reverse_lazy
+from django.contrib.auth import update_session_auth_hash
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.views.generic import FormView
+from .forms import PasswordChangeForm
+from orders.models import Order
 
 # Restrict the vendor from accessing the customer page
 def check_role_vendor(user):
@@ -193,7 +200,11 @@ def myAccount(request):
 @login_required(login_url="login")
 @user_passes_test(check_role_customer)
 def custDashboard(request):
-    return render(request, "accounts/custDashboard.html")
+    recent_orders = Order.objects.filter(user=request.user, is_ordered=True).order_by('-created_at')
+    context = {
+        'recent_orders' : recent_orders,
+    }
+    return render(request, "accounts/custDashboard.html", context)
 
 
 @login_required(login_url="login")
@@ -258,3 +269,29 @@ def reset_password(request):
             messages.error(request, "Password do not match!")
             return redirect("reset_password")
     return render(request, "accounts/reset_password.html")
+
+
+
+class PasswordChangeView(FormView):
+    template_name = 'accounts/password_change.html'
+    form_class = PasswordChangeForm
+    success_url = reverse_lazy('logout')
+
+    def get_form_kwargs(self):
+        """Pass the current user to the form."""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user  # Pass the logged-in user
+        return kwargs
+
+    def form_valid(self, form):
+        """If form is valid, change password."""
+        user = self.request.user
+        new_password = form.cleaned_data['new_password']
+        user.set_password(new_password)
+        user.save()
+
+        # Keep the user logged in after the password change
+        update_session_auth_hash(self.request, user)
+
+        messages.success(self.request, "Password changed successfully.")
+        return super().form_valid(form)

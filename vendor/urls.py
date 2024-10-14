@@ -4,6 +4,18 @@ from accounts import views as AccountViews
 
 from . import api_views, views
 
+
+fooditem_list = api_views.FoodItemViewSet.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+
+fooditem_detail = api_views.FoodItemViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'delete': 'destroy'
+})
+
 urlpatterns = [
     path("", AccountViews.vendorDashboard, name="vendor"),
     path("profile/", views.vprofile, name="vprofile"),
@@ -46,4 +58,7 @@ urlpatterns = [
         api_views.VendorFoodItemsByCategoryView.as_view(),
         name="category-detail-update-delete",
     ),
+    path('api_fooditems/', fooditem_list, name='fooditem-list'),  # List and Create
+    path('api_fooditems/<slug:slug>/', fooditem_detail, name='fooditem-detail'),  # Retrieve, Update, Delete
+
 ]

@@ -57,3 +57,47 @@ class UserProfileForm(forms.ModelForm):
         for field in self.fields:
             if field == "latitude" or field == "longitude":
                 self.fields[field].widget.attrs["readonly"] = "readonly"
+
+
+class UserInfoForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'phone_number']
+
+
+class PasswordChangeForm(forms.Form):
+    email = forms.EmailField(label="Email")
+    current_password = forms.CharField(
+        label="Current Password", 
+        widget=forms.PasswordInput()
+    )
+    new_password = forms.CharField(
+        label="New Password", 
+        widget=forms.PasswordInput()
+    )
+    confirm_new_password = forms.CharField(
+        label="Re-enter New Password", 
+        widget=forms.PasswordInput()
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
+    def clean_current_password(self):
+        """Check if current password is correct."""
+        current_password = self.cleaned_data.get('current_password')
+        if not self.user.check_password(current_password):
+            raise forms.ValidationError("Current password is incorrect.")
+        return current_password
+
+    def clean(self):
+        """Validate new passwords and check they match."""
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirm_new_password = cleaned_data.get('confirm_new_password')
+
+        if new_password and confirm_new_password:
+            if new_password != confirm_new_password:
+                raise forms.ValidationError("New passwords do not match.")
+        return cleaned_data
