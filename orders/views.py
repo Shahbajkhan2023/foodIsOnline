@@ -74,7 +74,7 @@ class PlaceOrderView(LoginRequiredMixin, FormView):
         # Example logic to get the vendor, adjust as needed
         cart_items = Cart.objects.filter(user=self.request.user)
         if cart_items.exists():
-            return cart_items.first().fooditem.vendor  # Assuming all items have the same vendor
+            return cart_items.first().fooditem.category.vendor  # Assuming all items have the same vendor
         return None
     
 
@@ -146,7 +146,7 @@ class PaymentsView(LoginRequiredMixin, TemplateView):
                 quantity=item.quantity,
                 price=item.fooditem.price,
                 amount=item.fooditem.price * item.quantity,
-                vendor=item.fooditem.vendor
+                vendor=item.fooditem.category.vendor
             )
 
         cart_items.delete()
