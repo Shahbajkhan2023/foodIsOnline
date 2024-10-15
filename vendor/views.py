@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import slugify
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.db import IntegrityError
 
 from accounts.forms import UserProfileForm
@@ -18,11 +18,7 @@ from django.views import View
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView
 from .mixins import AjaxAuthenticationMixin
-
-
-def get_vendor(request):
-    vendor = Vendor.objects.get(user=request.user)
-    return vendor
+from .utils import get_vendor
 
 
 def vprofile(request):
