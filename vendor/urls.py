@@ -18,29 +18,29 @@ fooditem_detail = api_views.FoodItemViewSet.as_view({
 
 urlpatterns = [
     path("", AccountViews.VendorDashboard.as_view(), name="vendor"),
-    path("profile/", views.vprofile, name="vprofile"),
-    path("menu-builder/", views.menu_builder, name="menu_builder"),
+    path("profile/", views.VendorProfile.as_view(), name="vprofile"),
+    path("menu-builder/", views.MenuBuilder.as_view(), name="menu_builder"),
     path(
         "menu-builder/category/<int:pk>/",
-        views.fooditems_by_category,
+        views.FoodItemsByCategory.as_view(),
         name="fooditems_by_category",
     ),
     # Category CRUD
-    path("menu-builder/category/add/", views.add_category, name="add_category"),
+    path("menu-builder/category/add/", views.AddCategory.as_view(), name="add_category"),
     path(
         "menu-builder/category/edit/<int:pk>/",
-        views.edit_category,
+        views.EditCategory.as_view(),
         name="edit_category",
     ),
     path(
         "menu-builder/category/delete/<int:pk>/",
-        views.delete_category,
+        views.DeleteCategory.as_view(),
         name="delete_category",
     ),
     # FoodItem CRUD
-    path("menu-builder/food/add/", views.add_food, name="add_food"),
-    path("menu-builder/food/edit/<int:pk>/", views.edit_food, name="edit_food"),
-    path("menu-builder/food/delete/<int:pk>/", views.delete_food, name="delete_food"),
+    path("menu-builder/food/add/", views.AddFood.as_view(), name="add_food"),
+    path("menu-builder/food/edit/<int:pk>/", views.EditFood.as_view(), name="edit_food"),
+    path("menu-builder/food/delete/<int:pk>/", views.DeleteFood.as_view(), name="delete_food"),
     # Opening Hour CRUD
     path('opening-hours/', views.OpeningHoursView.as_view(), name='opening_hours'),
     path('opening-hours/add/', views.AddOpeningHoursView.as_view(), name='add_opening_hours'),
