@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import slugify
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.db import IntegrityError
 
 from accounts.forms import UserProfileForm
@@ -16,190 +16,204 @@ from .models import Vendor, OpeningHour
 
 from django.views import View
 from django.views.generic import ListView
-from django.views.generic.edit import CreateView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.views.generic.edit import CreateView, FormView, UpdateView,DeleteView
 from .mixins import AjaxAuthenticationMixin
+from .utils import get_vendor
+from django.urls import reverse_lazy
+from django.urls import reverse
+from django.contrib.messages.views import SuccessMessageMixin
 
 
-def get_vendor(request):
-    vendor = Vendor.objects.get(user=request.user)
-    return vendor
 
+class VendorProfile(View):
+    template_name = "vendor/vprofile.html"
 
-def vprofile(request):
-    profile = get_object_or_404(UserProfile, user=request.user)
-    vendor = get_object_or_404(Vendor, user=request.user)
+    def get_object(self):
+        profile = get_object_or_404(UserProfile, user=self.request.user)
+        vendor = get_object_or_404(Vendor, user=self.request.user)
+        return profile, vendor
 
-    if request.method == "POST":
+    def get_context_data(self, profile, vendor, profile_form, vendor_form):
+        return {
+            'profile_form': profile_form,
+            'vendor_form': vendor_form,
+            'profile': profile,
+            'vendor': vendor,
+        }
+
+    def get(self, request, *args, **kwargs):
+        profile, vendor = self.get_object()
+        profile_form = UserProfileForm(instance=profile)
+        vendor_form = VendorForm(instance=vendor)
+        context = self.get_context_data(profile, vendor, profile_form, vendor_form)
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        profile, vendor = self.get_object()
         profile_form = UserProfileForm(request.POST, request.FILES, instance=profile)
         vendor_form = VendorForm(request.POST, request.FILES, instance=vendor)
+
         if profile_form.is_valid() and vendor_form.is_valid():
             profile_form.save()
             vendor_form.save()
             messages.success(request, "Settings updated.")
             return redirect("vprofile")
         else:
-            print(profile_form.errors)
-            print(vendor_form.errors)
-    else:
-        profile_form = UserProfileForm(instance=profile)
-        vendor_form = VendorForm(instance=vendor)
+            messages.error(request, "There were errors in your form. Please correct them.")
 
-    context = {
-        "profile_form": profile_form,
-        "vendor_form": vendor_form,
-        "profile": profile,
-        "vendor": vendor,
-    }
-    return render(request, "vendor/vprofile.html", context)
+        context = self.get_context_data(profile, vendor, profile_form, vendor_form)
+        return render(request, self.template_name, context)
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def menu_builder(request):
-    vendor = get_vendor(request)
-    categories = Category.objects.filter(vendor=vendor).order_by("created_at")
-    context = {
-        "categories": categories,
-    }
-    return render(request, "vendor/menu_builder.html", context)
+class MenuBuilder(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    model = Category
+    template_name = "vendor/menu_builder.html"
+    context_object_name = "categories"
+    login_url = "login"  
+
+    def test_func(self):
+        # Assuming `check_role_vendor` is the function that checks if user is a vendor
+        return check_role_vendor(self.request.user)
+
+    def get_queryset(self):
+        vendor = get_vendor(self.request)
+        return Category.objects.filter(vendor=vendor).order_by("created_at")
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def fooditems_by_category(request, pk=None):
-    vendor = get_vendor(request)
-    category = get_object_or_404(Category, pk=pk)
-    fooditems = FoodItem.objects.filter(vendor=vendor, category=category)
-    context = {
-        "fooditems": fooditems,
-        "category": category,
-    }
-    return render(request, "vendor/fooditems_by_category.html", context)
+class FoodItemsByCategory(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    model = FoodItem
+    template_name = "vendor/fooditems_by_category.html"
+    context_object_name = "fooditems"
+    login_url = "login"  
+
+    def test_func(self):
+        return check_role_vendor(self.request.user)
+
+    def get_queryset(self):
+        vendor = get_vendor(self.request)  # Get the logged-in vendor
+        self.category = get_object_or_404(Category, pk=self.kwargs['pk'], vendor=vendor)
+        return FoodItem.objects.filter(category=self.category)  # Filter food items by the selected category
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['category'] = self.category
+        return context
+    
+
+class AddCategory(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    template_name = "vendor/add_category.html"
+    form_class = CategoryForm
+    success_url = reverse_lazy("menu_builder")  
+
+    def test_func(self):
+        return check_role_vendor(self.request.user)
+
+    def form_valid(self, form):
+        category_name = form.cleaned_data["category_name"]
+        category = form.save(commit=False) 
+        category.vendor = get_vendor(self.request)  # Assign the vendor to the category
+        category.slug = slugify(category_name)  # Generate slug from category name
+        category.save()  
+        messages.success(self.request, "Category added successfully!")  
+        return super().form_valid(form) 
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def add_category(request):
-    if request.method == "POST":
-        form = CategoryForm(request.POST)
-        if form.is_valid():
-            category_name = form.cleaned_data["category_name"]
-            category = form.save(commit=False)
-            category.vendor = get_vendor(request)
-            category.slug = slugify(category_name)
-            form.save()
-            messages.success(request, "Category added successfully!")
-            return redirect("menu_builder")
-        else:
-            print(form.errors)
+class EditCategory(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, UpdateView):
+    model = Category
+    form_class = CategoryForm
+    template_name = "vendor/edit_category.html"
+    context_object_name = "category"
+    success_url = reverse_lazy("menu_builder")
+    success_message = "Category updated successfully!"
 
-    else:
-        form = CategoryForm()
-    context = {
-        "form": form,
-    }
-    return render(request, "vendor/add_category.html", context)
+    def test_func(self):
+        return check_role_vendor(self.request.user)
+
+    def form_valid(self, form):
+        category = form.save(commit=False)
+        category_name = form.cleaned_data["category_name"]
+        category.slug = slugify(category_name)
+        category.vendor = get_vendor(self.request)
+        category.save()
+        return super().form_valid(form)
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def edit_category(request, pk=None):
-    category = get_object_or_404(Category, pk=pk)
-    if request.method == "POST":
-        form = CategoryForm(request.POST, instance=category)
-        if form.is_valid():
-            category_name = form.cleaned_data["category_name"]
-            category = form.save(commit=False)
-            category.vendor = get_vendor(request)
-            category.slug = slugify(category_name)
-            form.save()
-            messages.success(request, "Category updated successfully!")
-            return redirect("menu_builder")
-        else:
-            print(form.errors)
+class DeleteCategory(LoginRequiredMixin, UserPassesTestMixin, View): 
 
-    else:
-        form = CategoryForm(instance=category)
-    context = {
-        "form": form,
-        "category": category,
-    }
-    return render(request, "vendor/edit_category.html", context)
+    def test_func(self):
+        return check_role_vendor(self.request.user)
+
+    def get(self, request, pk):
+        category = get_object_or_404(Category, pk=pk)
+        category.delete()
+        messages.success(request, "Category has been deleted successfully!")
+        return redirect("menu_builder")
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def delete_category(request, pk=None):
-    category = get_object_or_404(Category, pk=pk)
-    category.delete()
-    messages.success(request, "Category has been deleted successfully!")
-    return redirect("menu_builder")
+class AddFood(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    model = FoodItem
+    form_class = FoodItemForm
+    template_name = "vendor/add_food.html"
+    success_url = reverse_lazy("menu_builder")  # Redirect URL on success
+
+    def form_valid(self, form):
+        food = form.save(commit=False) 
+        food.vendor = get_vendor(self.request)  # Associate with the current vendor
+        food.slug = slugify(form.cleaned_data["food_title"]) 
+        food.save()  
+        messages.success(self.request, "Food Item added successfully!")
+        return super().form_valid(form)  
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Set queryset for the category field based on the logged-in vendor
+        form.fields["category"].queryset = Category.objects.filter(vendor=get_vendor(self.request))
+        return form
+
+    def test_func(self):
+        return check_role_vendor(self.request.user)  # Ensure the user has the vendor role
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def add_food(request):
-    if request.method == "POST":
-        form = FoodItemForm(request.POST, request.FILES)
-        if form.is_valid():
-            foodtitle = form.cleaned_data["food_title"]
-            food = form.save(commit=False)
-            food.vendor = get_vendor(request)
-            food.slug = slugify(foodtitle)
-            form.save()
-            messages.success(request, "Food Item added successfully!")
-            return redirect("fooditems_by_category", food.category.id)
-        else:
-            print(form.errors)
-    else:
-        form = FoodItemForm()
-        # modify this form
-        form.fields["category"].queryset = Category.objects.filter(
-            vendor=get_vendor(request)
-        )
-    context = {
-        "form": form,
-    }
-    return render(request, "vendor/add_food.html", context)
+class EditFood(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, UpdateView):
+    model = FoodItem
+    form_class = FoodItemForm
+    template_name = "vendor/edit_food.html"
+    context_object_name = "food"
+    success_url = reverse_lazy("menu_builder")  
+    login_url = "login"
+    success_message = "Food Item updated successfully!"
+
+    def test_func(self):
+        return check_role_vendor(self.request.user)
+
+    def get_queryset(self):
+        return FoodItem.objects.filter(category__vendor=get_vendor(self.request))
+
+    def form_valid(self, form):
+        food = form.save(commit=False)
+        food.vendor = get_vendor(self.request)  
+        food.slug = slugify(form.cleaned_data["food_title"])  
+        food.save() 
+        return super().form_valid(form)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields["category"].queryset = Category.objects.filter(vendor=get_vendor(self.request))
+        return form
 
 
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def edit_food(request, pk=None):
-    food = get_object_or_404(FoodItem, pk=pk)
-    if request.method == "POST":
-        form = FoodItemForm(request.POST, request.FILES, instance=food)
-        if form.is_valid():
-            foodtitle = form.cleaned_data["food_title"]
-            food = form.save(commit=False)
-            food.vendor = get_vendor(request)
-            food.slug = slugify(foodtitle)
-            form.save()
-            messages.success(request, "Food Item updated successfully!")
-            return redirect("fooditems_by_category", food.category.id)
-        else:
-            print(form.errors)
+class DeleteFood(LoginRequiredMixin, UserPassesTestMixin, View):
+   
+    def test_func(self):
+        return check_role_vendor(self.request.user)
 
-    else:
-        form = FoodItemForm(instance=food)
-        form.fields["category"].queryset = Category.objects.filter(
-            vendor=get_vendor(request)
-        )
-    context = {
-        "form": form,
-        "food": food,
-    }
-    return render(request, "vendor/edit_food.html", context)
-
-
-@login_required(login_url="login")
-@user_passes_test(check_role_vendor)
-def delete_food(request, pk=None):
-    food = get_object_or_404(FoodItem, pk=pk)
-    food.delete()
-    messages.success(request, "Food Item has been deleted successfully!")
-    return redirect("fooditems_by_category", food.category.id)
-
+    def get(self, request, pk):
+        food = get_object_or_404(FoodItem, pk=pk, category__vendor=get_vendor(request))
+        food.delete()
+        messages.success(request, "Food Item has been deleted successfully!") 
+        return redirect("fooditems_by_category", food.category.id) 
+    
 
 class OpeningHoursView(ListView):
     model = OpeningHour

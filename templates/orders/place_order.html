@@ -82,13 +82,8 @@
                                                     <span id="total">{{ grand_total }}</span>
                                                 </span>
                                             </li>
-                                            <!-- PayPal Checkout Button -->
-                                            <div id="paypal-button-container"></div>
-                                        </ul>
-                                        <!-- Payment Button -->
-                                        <form id="payment-form" method="POST" action="">
                                             {% csrf_token %}
-                                            <button type="button" id="ajax-pay-btn" class="btn btn-primary btn-block">Pay</button>
+                                            <button type="button" id="submitBtn" class="btn btn-primary btn-block">Pay</button>
                                         </form>
                                         
                                         <!-- End Payment Button -->
@@ -102,42 +97,50 @@
             </div>
         </div>
     </div>
+
 </div>
 <!-- Main Section End -->
 
-
-<script type="text/javascript">
-    $(document).ready(function () {
-        $('#ajax-pay-btn').click(function (e) {
-            e.preventDefault();
-            
-            // Static Data
-            var transaction_id = 'TXN123456789';  // Static transaction ID
-            var status = 'Success';  // Static status
-
-            // Dynamic Data
-            var order_number = "{{ order.order_number }}";
-            var payment_method = "{{ order.payment_method }}";
-
-            $.ajax({
-                type: "POST",
-                url: "{% url 'payments' %}",
-                data: {
-                    'order_number': order_number,
-                    'transaction_id': transaction_id,
-                    'payment_method': payment_method,
-                    'status': status,
-                    'csrfmiddlewaretoken': '{{ csrf_token }}'
-                },
-                success: function (response) {
-                    alert('Payment Success! Order Number: ' + response.order_number + ', Transaction ID: ' + response.transaction_id);
-                },
-                error: function (xhr, status, error) {
-                    alert('Payment Failed! Please try again.');
-                }
-            });
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelector("#submitBtn").addEventListener("click", function () {
+            fetch("{% url 'stripe_config' %}")  // Use Django template tag for URL
+                .then((result) => {
+                    if (!result.ok) {
+                        throw new Error('twork response was not ok');
+                    }
+                    return result.json();
+                })
+                .then((data) => {
+                    const stripe = Stripe(data.publicKey);
+                    return fetch("{% url 'create_checkout_session' %}?order_id={{ order.id }}", {  // Send order ID if needed
+                        method: "GET",  // Use GET here
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                    });
+                })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error('etwork response was not ok');
+                    }
+                    return response.json();
+                })
+                .then((sessionId) => {
+                    return stripe.redirectToCheckout({ sessionId: sessionId });
+                })
+                .then((result) => {
+                    if (result.error) {
+                        alert(result.error.message);
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error:", error);
+                    alert("An error occurred: " + error.message);  // Show user-friendly message
+                });
         });
     });
 </script>
+
 
 {% endblock %}
