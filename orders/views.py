@@ -12,6 +12,12 @@ from django.http import JsonResponse
 from .models import Payment, OrderedFood
 from decimal import Decimal
 import json
+import stripe
+from django.conf import settings # new
+from django.http.response import JsonResponse # new
+from django.views.decorators.csrf import csrf_exempt # new
+from django.utils.decorators import method_decorator
+from django.views import View
 
 
 class PlaceOrderView(LoginRequiredMixin, FormView):
@@ -77,6 +83,50 @@ class PlaceOrderView(LoginRequiredMixin, FormView):
             return cart_items.first().fooditem.category.vendor  # Assuming all items have the same vendor
         return None
     
+
+@method_decorator(csrf_exempt, name='dispatch')  # Apply CSRF exemption to all methods
+class StripeConfig(View):
+    def get(self, request, *args, **kwargs):
+        stripe_config = {'publicKey': settings.STRIPE_PUBLISHABLE_KEY}
+        return JsonResponse(stripe_config, safe=False)
+
+
+@method_decorator(csrf_exempt, name='dispatch')  # Apply CSRF exemption to all methods
+class CreateCheckoutSession(View):
+    def get(self, request, *args, **kwargs):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        domain_url = 'http://localhost:2001/'
+
+        try:
+            # Fetch the order ID from the query parameters
+            order_id = request.GET.get('order_id')  # Pass order_id in the GET request
+            order = Order.objects.get(id=order_id)  # Assuming an Order model exists
+            
+            # Create line items from the order
+            line_items = []
+            for item in order.items.all():  # Assuming an OrderItem relationship like order.items
+                line_items.append({
+                    'name': item.product.name,  # Adjust this according to your OrderItem model
+                    'quantity': item.quantity,
+                    'currency': 'usd',  # Adjust the currency if needed
+                    'amount': int(item.product.price * 100),  # Convert price to cents for Stripe
+                })
+
+            # Create Stripe checkout session
+            checkout_session = stripe.checkout.Session.create(
+                success_url=domain_url + 'success?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url=domain_url + 'cancelled/',
+                payment_method_types=['card'],
+                mode='payment',
+                line_items=line_items
+            )
+            return JsonResponse({'sessionId': checkout_session['id']})
+
+        except Order.DoesNotExist:
+            return JsonResponse({'error': 'Order not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+        
 
 class PaymentsView(LoginRequiredMixin, TemplateView):
     login_url = 'login'  # Redirect to login if not authenticated
@@ -150,4 +200,5 @@ class PaymentsView(LoginRequiredMixin, TemplateView):
             )
 
         cart_items.delete()
+
 
