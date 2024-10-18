@@ -58,33 +58,16 @@
                                         </table>
                                         <ul>
                                             <li style="list-style-type: none;">
-                                                Subtotal
+                                                Total
                                                 <span class="price float-right">
                                                     <span class="currency">$</span>
-                                                    <span id="subtotal">{{ subtotal }}</span>
+                                                    <b><span id="subtotal">{{ subtotal }}</span></b>
                                                 </span>
                                             </li>
-                                            {% for key, value in tax_dict.items %}
-                                                {% for i, j in value.items %}
-                                                    <li style="list-style-type: none;">
-                                                        {{ key }} <small>({{ i }}%)</small>
-                                                        <span class="price float-right">
-                                                            <span class="currency">$</span>
-                                                            <span id="tax-{{ key }}">{{ j }}</span>
-                                                        </span>
-                                                    </li>
-                                                {% endfor %}
-                                            {% endfor %}
-                                            <li style="list-style-type: none; font-weight: 600;">
-                                                TOTAL
-                                                <span class="price float-right">
-                                                    <span class="currency">$</span>
-                                                    <span id="total">{{ grand_total }}</span>
-                                                </span>
-                                            </li>
+                                            
                                             {% csrf_token %}
                                             <button type="button" id="submitBtn" class="btn btn-primary btn-block">Pay</button>
-                                        </form>
+                                    
                                         
                                         <!-- End Payment Button -->
                                     </div>
@@ -102,45 +85,44 @@
 <!-- Main Section End -->
 
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelector("#submitBtn").addEventListener("click", function () {
-            fetch("{% url 'stripe_config' %}")  // Use Django template tag for URL
-                .then((result) => {
-                    if (!result.ok) {
-                        throw new Error('twork response was not ok');
-                    }
-                    return result.json();
-                })
-                .then((data) => {
-                    const stripe = Stripe(data.publicKey);
-                    return fetch("{% url 'create_checkout_session' %}?order_id={{ order.id }}", {  // Send order ID if needed
-                        method: "GET",  // Use GET here
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                    });
-                })
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error('etwork response was not ok');
-                    }
-                    return response.json();
-                })
-                .then((sessionId) => {
-                    return stripe.redirectToCheckout({ sessionId: sessionId });
-                })
-                .then((result) => {
-                    if (result.error) {
-                        alert(result.error.message);
-                    }
-                })
-                .catch((error) => {
-                    console.error("Error:", error);
-                    alert("An error occurred: " + error.message);  // Show user-friendly message
-                });
+
+document.addEventListener("DOMContentLoaded", function() {
+    console.log("DOM fully loaded and parsed");
+
+    document.querySelector("#submitBtn").addEventListener("click", () => {
+        console.log("Submit button clicked");
+
+        fetch("/orders/config/")
+        .then((result) => {
+            return result.json();
+        })
+        .then((data) => {
+            const stripe = Stripe(data.publicKey);
+
+            // Log order ID before making the request
+            const orderId = "{{ order.id }}";  // Assuming `order.id` is in the template
+            console.log("Order ID:", orderId);  // Log the order ID to check if it's correct
+
+            // Fetch the checkout session with order ID
+            fetch(`/orders/create-checkout-session/?order_id=${orderId}`)
+            .then((result) => {
+                return result.json();
+            })
+            .then((data) => {
+                console.log("Session ID:", data.sessionId);
+                return stripe.redirectToCheckout({ sessionId: data.sessionId });
+            })
+            .catch((error) => {
+                console.error("Error during session creation:", error);
+            });
+        })
+        .catch((error) => {
+            console.error("Error fetching config:", error);
         });
     });
-</script>
+});
 
+
+</script>
 
 {% endblock %}

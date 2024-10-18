@@ -8,8 +8,15 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost',
+                 '127.0.0.1',
+                 'e934-2405-201-3027-e01e-85dc-66e7-179f-fb04.ngrok-free.app',
+                ]
 
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://e934-2405-201-3027-e01e-85dc-66e7-179f-fb04.ngrok-free.app',  # Add your ngrok URL here
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -139,5 +146,10 @@ REST_FRAMEWORK = {
     ),
 }
 
-STRIPE_PUBLISHABLE_KEY=('STRIPE_PUBLISHABLE_KEY')
-STRIPE_SECRET_KEY=config('STRIPE_SECRET_KEY')
+
+STRIPE_PUBLISHABLE_KEY='pk_test_51QAmbyCmbjEl6lbIi8cRIt3X4aBt1Bt01oYAnM5uaJmuGHXCPjYrV94PZWPonE8os05c7tJUM8PN3xuXIZ4vqEaV00YOfLVFTb'
+STRIPE_SECRET_KEY='sk_test_51QAmbyCmbjEl6lbIU1PLs94Y652SAadxlw3ixQFHyZLijEcbLS8RLhP6qr5W1P5lL2a5AXXqtIZeIrt1LYt1lsaK00a0JfQEkG'
+STRIPE_ENDPOINT_SECRET='whsec_de4265306a142c4f980dd1ab8e257b4e24f3a74e0f1ea9eca1dd0e6cef0174a2' 
+
+
+
