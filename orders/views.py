@@ -149,80 +149,6 @@ class CreateCheckoutSession(View):
         return JsonResponse(stripe_config, safe=False)
 
 
-class PaymentsView(LoginRequiredMixin, TemplateView):
-    login_url = 'login'  # Redirect to login if not authenticated
-    template_name = 'payments.html'  # Aapka payment page ka template
-
-    def post(self, request, *args, **kwargs):
-        # Check if the request is AJAX
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            # Retrieve Data from POST Request
-            order_number = request.POST.get('order_number')
-            transaction_id = request.POST.get('transaction_id')  # Static Transaction ID
-            payment_method = request.POST.get('payment_method')
-            status = request.POST.get('status')  # Static Status
-
-            # Fetch the Order object
-            try:
-                order = Order.objects.get(user=request.user, order_number=order_number)
-            except Order.DoesNotExist:
-                return JsonResponse({'error': 'Order does not exist.'}, status=404)
-
-            # Create Payment object and save it
-            payment = self.create_payment(request.user, transaction_id, payment_method, order.total, status)
-            
-            # Update the Order with the payment details
-            self.update_order(order, payment)
-
-            # Move Cart items to OrderedFood model
-            self.move_cart_to_ordered_food(request.user, order, payment)
-
-
-            # Prepare response
-            response = {
-                'order_number': order_number,
-                'transaction_id': transaction_id,
-            }
-            return JsonResponse(response)
-
-        return JsonResponse({'error': 'Invalid request. This endpoint only accepts AJAX requests.'}, status=400)
-
-    def create_payment(self, user, transaction_id, payment_method, amount, status):
-        """Creates and saves a payment."""
-        payment = Payment(
-            user=user,
-            transaction_id=transaction_id,
-            payment_method=payment_method,
-            amount=amount,
-            status=status
-        )
-        payment.save()
-        return payment
-
-    def update_order(self, order, payment):
-        """Updates the order with payment details."""
-        order.payment = payment
-        order.is_ordered = True
-        order.save()
-
-    def move_cart_to_ordered_food(self, user, order, payment):
-        """Moves cart items to OrderedFood model."""
-        cart_items = Cart.objects.filter(user=user)
-        for item in cart_items:
-            OrderedFood.objects.create(
-                order=order,
-                payment=payment,
-                user=user,
-                fooditem=item.fooditem,
-                quantity=item.quantity,
-                price=item.fooditem.price,
-                amount=item.fooditem.price * item.quantity,
-                vendor=item.fooditem.category.vendor
-            )
-
-        cart_items.delete()
-
-
 class SuccessView(TemplateView):
     template_name = 'success.html'
 
@@ -230,12 +156,12 @@ class SuccessView(TemplateView):
 class CancelledView(TemplateView):
     template_name = 'cancelled.html'
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 class StripeWeebhook(View):
     def post(self, request, *args, **kwargs):
         payload = request.body
         sig_header = request.META['HTTP_STRIPE_SIGNATURE']
-
         # Verify the webhook signature
         try:
             event = stripe.Webhook.construct_event(
@@ -255,22 +181,41 @@ class StripeWeebhook(View):
         return JsonResponse({'status': 'success'}, status=200)
     
     def handle_successful_payment(self, session):
-        order_id = session['metadata']['order_id']
-        payment_intent = session['payment_intent']
-        amount = session['amount_total'] / 100
+        order_id = session.get('metadata', {}).get('order_id')
+        
 
-        # Updae your order in the database
-        order = Order.objects.get(id=order_id)
-        order.payment = payment_intent
-        order.is_ordered = True
-        order.save()
+        # Retrieve payment intent and amount from the session
+        payment_intent = session.get('payment_intent')
+        amount = session.get('amount_total') / 100  # amount_total is in cents
 
-        # Create a Payment record
-        payment = Payment.objects.create(
-            user = order.user,
-            transaction_id = payment_intent,
-            payment_method = 'Stripe',
-            amount = amount,
-            status = 'Completed',
-        )
-        payment.save()
+        try:
+            # Update the order in the database
+            order = Order.objects.get(id=order_id)
+
+            # Create a Payment record
+            payment = Payment.objects.create(
+                user=order.user,
+                transaction_id=payment_intent,
+                payment_method=order.payment_method,
+                amount=amount,
+                status='Completed',
+            )
+
+            # Assign the Payment instance to the order's payment field
+            order.payment = payment  # Set the order's payment to the Payment instance
+            order.is_ordered = True
+            order.save()
+
+            # update orderedfood 
+            OrderedFood.objects.filter(order=order).update(payment=payment)
+
+            # delete cart items 
+            cart_items = Cart.objects.filter(user=order.user)
+            cart_items.delete()
+
+            print(f"Payment for Order ID {order_id} successfully recorded with transaction ID {payment_intent}.")
+        except Order.DoesNotExist:
+            print(f"Order with ID {order_id} does not exist.")
+        except Exception as e:
+            print(f"An error occurred while processing the payment: {str(e)}")
+            
