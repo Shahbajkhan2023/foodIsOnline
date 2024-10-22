@@ -6,7 +6,7 @@ from django.core.mail import EmailMessage, message
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-
+from django.core.exceptions import PermissionDenied
 
 def detectUser(user):
     if user.role == 1:
@@ -19,6 +19,21 @@ def detectUser(user):
         redirectUrl = "/admin"
         return redirectUrl
 
+
+# Restrict the vendor from accessing the customer page
+def check_role_vendor(user):
+    if user.role == 1:
+        return True
+    else:
+        raise PermissionDenied
+
+
+# Restrict the customer from accessing the vendor page
+def check_role_customer(user):
+    if user.role == 2:
+        return True
+    else:
+        raise PermissionDenied
 
 def send_verification_email(request, user, mail_subject, email_template):
     from_email = settings.DEFAULT_FROM_EMAIL

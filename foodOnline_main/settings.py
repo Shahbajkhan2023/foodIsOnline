@@ -8,8 +8,12 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://a8e0-2405-201-3027-e01e-33e3-8144-fadd-5689.ngrok-free.app',  # Add your ngrok URL here
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -138,3 +142,11 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ),
 }
+
+
+STRIPE_PUBLISHABLE_KEY=config('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY=config('STRIPE_SECRET_KEY')
+STRIPE_ENDPOINT_SECRET=config('STRIPE_ENDPOINT_SECRET') 
+
+
+
