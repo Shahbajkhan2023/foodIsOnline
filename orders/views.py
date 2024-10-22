@@ -18,9 +18,8 @@ from django.http.response import JsonResponse # new
 from django.views.decorators.csrf import csrf_exempt # new
 from django.utils.decorators import method_decorator
 from django.views import View
-
-
 from django.shortcuts import redirect
+from django.db import transaction
 
 class PlaceOrderView(LoginRequiredMixin, FormView):
     login_url = 'login'
@@ -63,32 +62,38 @@ class PlaceOrderView(LoginRequiredMixin, FormView):
         amounts = get_cart_amounts(self.request)
         tax_data = json.dumps(amounts['tax_dict'], default=self.decimal_to_float)
 
-        order = Order.objects.create(
-            user=self.request.user,
-            total=amounts['grand_total'],
-            tax_data=tax_data,
-            total_tax=amounts['tax'],
-            payment_method=self.request.POST['payment_method'],
-            vendor=self.get_vendor(),
-            **form.cleaned_data
-        )
-        order.order_number = generate_order_number(order.id)
-        order.save()
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(
+                    user=self.request.user,
+                    total=amounts['grand_total'],
+                    tax_data=tax_data,
+                    total_tax=amounts['tax'],
+                    payment_method=self.request.POST['payment_method'],
+                    vendor=self.get_vendor(),
+                    **form.cleaned_data
+                )
+                order.order_number = generate_order_number(order.id)
+                order.save()
 
-        cart_items = Cart.objects.filter(user=self.request.user)
-        for item in cart_items:
-            OrderedFood.objects.create(
-                order=order,
-                user=self.request.user,
-                fooditem=item.fooditem,
-                quantity=item.quantity,
-                price=item.fooditem.price,
-                amount=item.fooditem.price * item.quantity,
-                vendor=item.fooditem.category.vendor
-            )
+                cart_items = Cart.objects.filter(user=self.request.user)
+                for item in cart_items:
+                    OrderedFood.objects.create(
+                        order=order,
+                        user=self.request.user,
+                        fooditem=item.fooditem,
+                        quantity=item.quantity,
+                        price=item.fooditem.price,
+                        amount=item.fooditem.price * item.quantity,
+                        vendor=item.fooditem.category.vendor
+                    )
 
-        # Clear the cart after placing the order
-        return order
+                # Clear the cart after placing the order
+                return order
+            
+
+        except Exception as e:
+            raise e
 
     def get_vendor(self):
         cart_items = Cart.objects.filter(user=self.request.user)
@@ -189,33 +194,34 @@ class StripeWeebhook(View):
         amount = session.get('amount_total') / 100  # amount_total is in cents
 
         try:
+            with transaction.atomic():
+
             # Update the order in the database
-            order = Order.objects.get(id=order_id)
+                order = Order.objects.get(id=order_id)
 
-            # Create a Payment record
-            payment = Payment.objects.create(
-                user=order.user,
-                transaction_id=payment_intent,
-                payment_method=order.payment_method,
-                amount=amount,
-                status='Completed',
-            )
+                # Create a Payment record
+                payment = Payment.objects.create(
+                    user=order.user,
+                    transaction_id=payment_intent,
+                    payment_method=order.payment_method,
+                    amount=amount,
+                    status='Completed',
+                )
 
-            # Assign the Payment instance to the order's payment field
-            order.payment = payment  # Set the order's payment to the Payment instance
-            order.is_ordered = True
-            order.save()
+                # Assign the Payment instance to the order's payment field
+                order.payment = payment  # Set the order's payment to the Payment instance
+                order.is_ordered = True
+                order.save()
 
-            # update orderedfood 
-            OrderedFood.objects.filter(order=order).update(payment=payment)
+                # update orderedfood 
+                OrderedFood.objects.filter(order=order).update(payment=payment)
 
-            # delete cart items 
-            cart_items = Cart.objects.filter(user=order.user)
-            cart_items.delete()
+                # delete cart items 
+                cart_items = Cart.objects.filter(user=order.user)
+                cart_items.delete()
 
-            print(f"Payment for Order ID {order_id} successfully recorded with transaction ID {payment_intent}.")
         except Order.DoesNotExist:
             print(f"Order with ID {order_id} does not exist.")
         except Exception as e:
             print(f"An error occurred while processing the payment: {str(e)}")
-            
+            raise

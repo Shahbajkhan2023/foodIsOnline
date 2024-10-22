@@ -8,10 +8,7 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = ['localhost',
-                 '127.0.0.1',
-                 'a8e0-2405-201-3027-e01e-33e3-8144-fadd-5689.ngrok-free.app',
-                ]
+ALLOWED_HOSTS = ['*']
 
 
 CSRF_TRUSTED_ORIGINS = [
