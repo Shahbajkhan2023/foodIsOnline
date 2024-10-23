@@ -1,0 +1,19 @@
+{% autoescape off %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Vendor Report</title>
+</head>
+<body>
+    <p>Dear {{ user.first_name }},</p>
+
+    <p>Attached is your order report for {{ yesterday }}.</p>
+
+    <p>Please find the detailed report in the CSV file attached.</p>
+
+    <p>Best regards,</p>
+    <p>Your FoodIsOnline Team</p>
+</body>
+</html>
+{% endautoescape %}

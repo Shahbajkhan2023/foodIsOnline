@@ -1,6 +1,7 @@
 from pathlib import Path
-
 from decouple import config
+from celery.schedules import crontab
+from django.contrib.messages import constants as messages
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,8 +9,11 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://e3b6-2405-201-3027-e01e-ed0a-da6a-6541-11b3.ngrok-free.app', 
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -72,8 +76,8 @@ DATABASES = {
         "NAME": "fooddb",
         "USER": "user",
         "PASSWORD": "123",
-        "HOST": "localhost",  # Or an IP address if the database is on a remote server
-        "PORT": "5432",  # Default PostgreSQL port
+        "HOST": "localhost",  
+        "PORT": "5432",  
     }
 }
 
@@ -117,7 +121,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-from django.contrib.messages import constants as messages
 
 MESSAGE_TAGS = {
     messages.ERROR: "danger",
@@ -137,4 +140,20 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.TokenAuthentication",
     ),
+}
+
+
+STRIPE_PUBLISHABLE_KEY=config('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY=config('STRIPE_SECRET_KEY')
+STRIPE_ENDPOINT_SECRET=config('STRIPE_ENDPOINT_SECRET') 
+
+
+CELERY_BROKER_URL = 'redis://localhost:6380/0'
+
+
+CELERY_BEAT_SCHEDULE = {
+    'send-vendor-reports-every-minute': {
+        'task': 'orders.tasks.send_vendor_reports',
+        'schedule': crontab(), 
+    },
 }
