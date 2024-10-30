@@ -1,6 +1,6 @@
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APITransactionTestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory
 from rest_framework.authtoken.models import Token
@@ -8,6 +8,7 @@ from django.test import TestCase
 from accounts.models import UserProfile
 from vendor.models import Vendor
 from accounts.api_views import PasswordResetView
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 User = get_user_model()
@@ -209,3 +210,62 @@ class PasswordResetViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["email"][0], "User with this email does not exist")
         
+
+class RegisterVendorViewTestCase(APITransactionTestCase):
+    def setUp(self):  # Corrected the method name to setUp
+        self.url = reverse('register_vendor')
+
+        self.valid_user_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "johndoe",
+            "email": "john@example.com",
+            "password": "securepassword",
+            "confirm_password": "securepassword",
+            "role": User.VENDOR,
+        }
+
+        self.valid_vendor_data = {
+            "vendor_name": "John's Store",
+            "vendor_license": None,  
+            "is_approved": False,
+        }
+
+    def test_register_vendor_success(self):
+        
+        data = {**self.valid_user_data, **self.valid_vendor_data}
+        response = self.client.post(self.url, data, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("message", response.data)
+
+        user = User.objects.get(username='johndoe')
+        vendor = Vendor.objects.get(user=user)
+        self.assertEqual(vendor.vendor_name, "John's Store")
+
+    def test_register_vendor_invalid_user_data(self):
+    
+        invalid_data = {**self.valid_user_data, "username": ""}
+        response = self.client.post(self.url, invalid_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user_errors", response.data)
+
+    def test_register_vendor_invalid_vendor_data(self):
+        # Invalid vendor name
+        data = {**self.valid_user_data, **self.valid_vendor_data, "vendor_name": ""}
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("vendor_errors", response.data)
+
+    def test_register_vendor_password_mismatch(self):
+        # Password and confirm_password do not match
+        invalid_data = {
+            **self.valid_user_data,
+            "confirm_password": "differentpassword"
+        }
+        response = self.client.post(self.url, invalid_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("confirm_password", response.data)
