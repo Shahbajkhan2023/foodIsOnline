@@ -8,10 +8,71 @@ from django.test import TestCase
 from accounts.models import UserProfile
 from vendor.models import Vendor
 from accounts.api_views import PasswordResetView
-from django.core.files.uploadedfile import SimpleUploadedFile
+
+from django.contrib.staticfiles.testing import LiveServerTestCase
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from accounts.models import User
+import os
+import time
 
 
 User = get_user_model()
+
+
+class HomeViewLiveServerTest(LiveServerTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.selenium = webdriver.Chrome()
+        cls.selenium.implicitly_wait(10)
+        cls.ngrok_url = "https://8c5d-2405-201-3027-e01e-c3e2-5792-37da-6aa2.ngrok-free.app"  
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.selenium.quit()
+        super().tearDownClass()
+
+    def setUp(self):
+        
+        active_user = User.objects.create(
+            email="activel_vendor@example.com", 
+            is_active=True, 
+            role=User.VENDOR
+        )
+        inactive_user = User.objects.create(
+            email="inactivel_vendor@example.com", 
+            is_active=False, 
+            role=User.VENDOR
+        )
+
+        self.vendor1 = Vendor.objects.create(
+            vendor_name="Approved Active Vendor 1",
+            is_approved=True,
+            user=active_user
+        )
+        self.vendor2 = Vendor.objects.create(
+            vendor_name="Unapproved Vendor",
+            is_approved=False,
+            user=active_user
+        )
+        self.vendor3 = Vendor.objects.create(
+            vendor_name="Inactive Vendor",
+            is_approved=True,
+            user=inactive_user
+        )
+
+    def test_home_view_displays_approved_and_active_vendors(self):
+        url = f"{self.ngrok_url}{reverse('home')}"
+        self.selenium.get(url)
+
+        vendor_elements = self.selenium.find_elements(By.CSS_SELECTOR, ".post-title h5 a")
+
+        displayed_vendors = [vendor.text for vendor in vendor_elements]
+
+        self.assertIn("Approved Active Vendor 1", displayed_vendors)
+        self.assertNotIn("Unapproved Vendor", displayed_vendors)
+        self.assertNotIn("Inactive Vendor", displayed_vendors)
 
 
 class RegisterUserViewTest(APITestCase):
