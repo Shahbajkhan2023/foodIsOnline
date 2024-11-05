@@ -13,8 +13,8 @@ from django.contrib.staticfiles.testing import LiveServerTestCase
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from accounts.models import User
-import os
-import time
+from .factories import UserFactory
+from rest_framework.authtoken.models import Token
 
 
 User = get_user_model()
@@ -330,3 +330,37 @@ class RegisterVendorViewTestCase(APITransactionTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("confirm_password", response.data)
+
+
+class LoginViewTestCase(APITestCase):
+    def setUp(self):
+        self.user_password = "testpassword"
+        self.user = UserFactory(email="testuser@example.com", password=self.user_password)
+        self.login_url = reverse("api_login")  
+
+    def test_login_success(self):
+        data = {
+            "email": self.user.email,
+            "password": self.user_password,
+        }
+        response = self.client.post(self.login_url, data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("token", response.data)
+
+    def test_login_failure_wrong_password(self):
+        data = {
+            "email": self.user.email,
+            "password": "wrongpassword",
+        }
+        response = self.client.post(self.login_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+
+    def test_login_failure_nonexistent_user(self):
+        data = {
+            "email": "nonexistent@example.com",
+            "password": "testpassword",
+        }
+        response = self.client.post(self.login_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
