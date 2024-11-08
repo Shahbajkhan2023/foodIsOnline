@@ -26,133 +26,92 @@ from .forms import PasswordChangeForm
 from orders.models import Order
 
 
-class RegisterUser(CreateView):
+class RegisterUser(View):
     template_name = "accounts/registerUser.html"
-    form_class = UserForm
-    success_url = reverse_lazy("registerUser")
 
-    def dispatch(self, request, *args, **kwargs):
+    def get(self, request):
         if request.user.is_authenticated:
             messages.warning(request, "You are already logged in!")
             return redirect("custDashboard")
-        return super().dispatch(request, *args, **kwargs)
+        return render(request, self.template_name, {"form": UserForm()})
 
-    def form_valid(self, form):
-        user = self.create_user(form)
-        self.send_verification_email(user)
-        messages.success(self.request, "Your account has been registered successfully!")
-        return super().form_valid(form)
+    def post(self, request):
+        if request.user.is_authenticated:
+            messages.warning(request, "You are already logged in!")
+            return redirect("custDashboard")
+        
+        form = UserForm(request.POST)
 
-    def create_user(self, form):
-        user = User.objects.create_user(**form.cleaned_data)
-        user.role = User.CUSTOMER
-        user.save()
-        return user
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.set_password(form.cleaned_data["password"])  
+            user.role = User.CUSTOMER
+            user.save()
 
-    def send_verification_email(self, user):
-        mail_subject = "Please activate your account"
-        email_template = "accounts/emails/account_verification_email.html"
-        send_verification_email(self.request, user, mail_subject, email_template)
+            mail_subject = "Please activate your account"
+            email_template = "accounts/emails/account_verification_email.html"
+            send_verification_email(request, user, mail_subject, email_template)
+            messages.success(request, "Your account has been registered successfully!")
+            return redirect("registerUser")
 
- 
-class RegisterVendor(CreateView):
+        return render(request, self.template_name, {"form": form})
+
+
+class RegisterVendor(View):
     template_name = "accounts/registerVendor.html"
-    form_class = UserForm
-    success_url = reverse_lazy("registerVendor")  
 
-    def dispatch(self, request, *args, **kwargs):
+    def get(self, request):
         if request.user.is_authenticated:
             messages.warning(request, "You are already logged in!")
             return redirect("myAccount")
-        return super().dispatch(request, *args, **kwargs)
+        return render(request, self.template_name, {"form": UserForm(), "v_form": VendorForm()})
 
-    def get_context_data(self, **kwargs):
-        """To include both UserForm and VendorForm in the context."""
-        context = super().get_context_data(**kwargs)
-        if self.request.method == "POST":
-            context["v_form"] = VendorForm(self.request.POST, self.request.FILES)
-        else:
-            context["v_form"] = VendorForm()
-        return context
-
-    def form_valid(self, form):
-        v_form = VendorForm(self.request.POST, self.request.FILES)
-
+    def post(self, request):
+        if request.user.is_authenticated:
+            messages.warning(request, "You are already logged in!")
+            return redirect("myAccount")
+        form, v_form = UserForm(request.POST), VendorForm(request.POST, request.FILES)
         if form.is_valid() and v_form.is_valid():
-            # Create the user
-            user = self.create_user(form)
-            # Create the vendor
-            self.create_vendor(v_form, user)
-
-            # Send verification email
-            self.send_verification_email(user)
-
-            messages.success(
-                self.request,
-                "Your account has been registered successfully! Please wait for approval.",
+            user = User.objects.create_user(
+                first_name=form.cleaned_data["first_name"],
+                last_name=form.cleaned_data["last_name"],
+                username=form.cleaned_data["username"],
+                email=form.cleaned_data["email"],
+                password=form.cleaned_data["password"],
             )
-            return super().form_valid(form)
-        else:
-            return self.form_invalid(form)
 
-    def create_user(self, form):
-        user = User.objects.create_user(**form.cleaned_data)
-        user.role = User.VENDOR
-        user.save()
-        return user
-
-    def create_vendor(self, v_form, user):
-        vendor = v_form.save(commit=False)
-        vendor.user = user
-        vendor_name = v_form.cleaned_data["vendor_name"]
-        vendor.vendor_slug = slugify(vendor_name) + "-" + str(user.id)
-        user_profile = UserProfile.objects.get(user=user)
-        vendor.user_profile = user_profile
-        vendor.save()
-
-    def send_verification_email(self, user):
-        mail_subject = "Please activate your account"
-        email_template = "accounts/emails/account_verification_email.html"
-        send_verification_email(self.request, user, mail_subject, email_template)
-
-    def form_invalid(self, form):
-        v_form = VendorForm(self.request.POST, self.request.FILES)
-        return self.render_to_response(self.get_context_data(form=form, v_form=v_form))
+            vendor = v_form.save(commit=False)
+            vendor.user, vendor.vendor_slug = user, slugify(v_form.cleaned_data["vendor_name"]) + f"-{user.id}"
+            vendor.user_profile = UserProfile.objects.get(user=user)
+            vendor.save()
+            send_verification_email(request, user, "Please activate your account", "accounts/emails/account_verification_email.html")
+            messages.success(request, "Your account has been registered successfully! Please wait for the approval.")
+            return redirect("registerVendor")
+        return render(request, self.template_name, {"form": form, "v_form": v_form})
 
 
 class Activate(View):
-    
     def get(self, request, uidb64, token):
-        user = self.get_user_from_uid(uidb64)
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User._default_manager.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
 
-        if user and self.is_token_valid(user, token):
-            self.activate_user(user)
+        if user is not None and default_token_generator.check_token(user, token):
+            user.is_active = True
+            user.save()
             messages.success(request, "Congratulations! Your account is activated.")
             return redirect("myAccount")
         else:
-            messages.error(request, "Invalid activation link.")
+            messages.error(request, "Invalid activation link")
             return redirect("myAccount")
-
-    def get_user_from_uid(self, uidb64):
-        try:
-            uid = urlsafe_base64_decode(uidb64).decode()
-            return User._default_manager.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return None
-
-    def is_token_valid(self, user, token):
-        return default_token_generator.check_token(user, token)
-
-    def activate_user(self, user):
-        user.is_active = True
-        user.save()
 
 
 class Login(View):
     template_name = "accounts/login.html"
 
     def get(self, request):
-        # If the user is already authenticated, redirect them
         if request.user.is_authenticated:
             messages.warning(request, "You are already logged in!")
             return redirect("myAccount")
@@ -180,7 +139,7 @@ class Logout(LogoutView):
 
 
 class MyAccount(LoginRequiredMixin, View):
-    login_url = 'login'  # Redirect to login if not authenticated
+    login_url = 'login' 
 
     def get(self, request):
         user = request.user
