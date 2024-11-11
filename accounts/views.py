@@ -15,7 +15,7 @@ from vendor.forms import VendorForm
 
 from .forms import UserForm
 from .models import User, UserProfile
-from .utils import detectUser, send_verification_email, check_role_customer, check_role_vendor
+from .utils import detectUser, check_role_customer, check_role_vendor
 
 from django.urls import reverse_lazy
 from django.contrib.auth import update_session_auth_hash
@@ -24,6 +24,7 @@ from django.shortcuts import render, redirect
 from django.views.generic import FormView
 from .forms import PasswordChangeForm
 from orders.models import Order
+from accounts.tasks import send_verification_email_task
 
 
 class RegisterUser(View):
@@ -35,6 +36,7 @@ class RegisterUser(View):
             return redirect("custDashboard")
         return render(request, self.template_name, {"form": UserForm()})
 
+    
     def post(self, request):
         if request.user.is_authenticated:
             messages.warning(request, "You are already logged in!")
@@ -50,7 +52,10 @@ class RegisterUser(View):
 
             mail_subject = "Please activate your account"
             email_template = "accounts/emails/account_verification_email.html"
-            send_verification_email(request, user, mail_subject, email_template)
+            ngrok_url = f"https://{request.META['HTTP_HOST']}"
+
+            # Enqueue Celery task with necessary data
+            send_verification_email_task.delay(user.id, mail_subject, email_template, ngrok_url)
             messages.success(request, "Your account has been registered successfully!")
             return redirect("registerUser")
 
@@ -84,7 +89,10 @@ class RegisterVendor(View):
             vendor.user, vendor.vendor_slug = user, slugify(v_form.cleaned_data["vendor_name"]) + f"-{user.id}"
             vendor.user_profile = UserProfile.objects.get(user=user)
             vendor.save()
-            send_verification_email(request, user, "Please activate your account", "accounts/emails/account_verification_email.html")
+            ngrok_url = f"https://{request.META['HTTP_HOST']}"
+
+            # Enqueue Celery task with necessary data
+            send_verification_email_task.delay(user.id, "Please activate your account", "accounts/emails/account_verification_email.html", ngrok_url)
             messages.success(request, "Your account has been registered successfully! Please wait for the approval.")
             return redirect("registerVendor")
         return render(request, self.template_name, {"form": form, "v_form": v_form})
@@ -182,114 +190,70 @@ class ForgotPassword(View):
 
     def post(self, request):
         email = request.POST.get("email")
-        
-        if self.is_email_valid(email):
-            user = self.get_user_by_email(email)
-            self.send_reset_email(request, user)
+        user = User.objects.filter(email=email).first()
+
+        if user:
+            mail_subject = "Reset Your Password"
+            email_template = "accounts/emails/reset_password_email.html"
+            send_verification_email(request, user, mail_subject, email_template)
+
             messages.success(request, "Password reset link has been sent to your email address.")
             return redirect("login")
-        else:
-            messages.error(request, "Account does not exist.")
-            return redirect("forgot_password")
-
-    def is_email_valid(self, email):
-        return User.objects.filter(email=email).exists()
-
-    def get_user_by_email(self, email):
-        return User.objects.get(email=email)
-
-    def send_reset_email(self, request, user):
-        mail_subject = "Reset Your Password"
-        email_template = "accounts/emails/reset_password_email.html"
-        send_verification_email(request, user, mail_subject, email_template)
+        messages.error(request, "Account does not exist")
+        return redirect("forgot_password")
 
 
 class ResetPasswordValidate(View):
     def get(self, request, uidb64, token):
-        """Validate the user by decoding the token and user pk."""
-        user = self.get_user(uidb64)
-
-        if self.is_valid_user(user, token):
-            self.set_user_session(request, user.id)
-            messages.info(request, "Please reset your password.")
-            return redirect("reset_password")
-        else:
-            messages.error(request, "This link has expired!")
-            return redirect("myAccount")
-
-    def get_user(self, uidb64):
-        """Decode the uid and retrieve the user."""
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
-            return User._default_manager.get(pk=uid)
+            user = User._default_manager.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return None
+            user = None
 
-    def is_valid_user(self, user, token):
-        return user is not None and default_token_generator.check_token(user, token)
-
-    def set_user_session(self, request, uid):
-        request.session["uid"] = uid
-
+        if user and default_token_generator.check_token(user, token):
+            request.session["uid"] = uid
+            messages.info(request, "Please reset your password")
+            return redirect("reset_password")
+        else:
+            messages.error(request, "This link has been expired!")
+            return redirect("myAccount")
+        
 
 class ResetPassword(View):
-    template_name = "accounts/reset_password.html"
-
     def get(self, request):
-        return render(request, self.template_name)
+        return render(request, "accounts/reset_password.html")
 
     def post(self, request):
-        password, confirm_password = self.get_passwords(request)
-
-        if self.passwords_match(password, confirm_password):
-            # Get the user and reset the password
-            user = self.get_user(request)
-            self.reset_user_password(user, password)
-
+        password, confirm_password = request.POST.get("password"), request.POST.get("confirm_password")
+        
+        if password == confirm_password and request.session.get("uid"):
+            user = User.objects.get(pk=request.session["uid"])
+            user.set_password(password)
+            user.is_active = True
+            user.save()
             messages.success(request, "Password reset successful")
             return redirect("login")
-        else:
-            messages.error(request, "Passwords do not match!")
-            return redirect("reset_password")
-
-    def get_passwords(self, request):
-        password = request.POST.get("password")
-        confirm_password = request.POST.get("confirm_password")
-        return password, confirm_password
-
-    def passwords_match(self, password, confirm_password):
-        return password == confirm_password
-
-    def get_user(self, request):
-        pk = request.session.get("uid")
-        return User.objects.get(pk=pk)
-
-    def reset_user_password(self, user, password):
-        user.set_password(password)
-        user.is_active = True
-        user.save()
+        
+        messages.error(request, "Passwords do not match or session expired")
+        return redirect("reset_password")
 
 
-class PasswordChangeView(FormView):
+class PasswordChangeView(View):
     template_name = 'accounts/password_change.html'
-    form_class = PasswordChangeForm
-    success_url = reverse_lazy('logout')
 
-    def get_form_kwargs(self):
-        """Pass the current user to the form."""
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user  # Pass the logged-in user
-        return kwargs
+    def get(self, request):
+        return render(request, self.template_name, {'form': PasswordChangeForm(user=request.user)})
 
-    def form_valid(self, form):
-        """If form is valid, change password."""
-        user = self.request.user
-        new_password = form.cleaned_data['new_password']
-        user.set_password(new_password)
-        user.save()
-
-        # Keep the user logged in after the password change
-        update_session_auth_hash(self.request, user)
-
-        messages.success(self.request, "Password changed successfully.")
-        return super().form_valid(form)
+    def post(self, request):
+        form = PasswordChangeForm(request.POST, user=request.user)
+        if form.is_valid():
+            user = request.user
+            user.set_password(form.cleaned_data['new_password'])
+            user.save()
+            update_session_auth_hash(request, user)
+            messages.success(request, "Password changed successfully.")
+            return redirect('logout')
+        
+        messages.error(request, "Please correct the errors below.")
+        return render(request, self.template_name, {'form': form})
