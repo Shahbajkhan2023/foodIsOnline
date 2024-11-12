@@ -1,17 +1,15 @@
 from django.views.generic import ListView
-from django.views.generic import DetailView
 from django.views import View
-from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404
+from django.shortcuts import render
 
 from menu.models import Category, FoodItem
 from vendor.models import Vendor
 
 from .context_processors import get_cart_amounts, get_cart_counter
 from marketplace.models import Cart as cart_model
-from django.shortcuts import render
 from accounts.models import UserProfile
 from django.views.generic import TemplateView
 from django.shortcuts import redirect
@@ -19,49 +17,39 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from orders.forms import OrderForm
 
 
-class Marketplace(ListView):
-    model = Vendor
-    template_name = "marketplace/listings.html"
-    context_object_name = "vendors"
-    
-    def get_queryset(self):
-        return Vendor.objects.filter(is_approved=True, user__is_active=True)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["vendor_count"] = self.get_queryset().count() 
-        return context
+class Marketplace(View):
+    def get(self, request):
+        vendors = Vendor.objects.filter(is_approved=True, user__is_active=True)
+        vendor_count = vendors.count()
+        context = {
+            "vendors": vendors,
+            "vendor_count": vendor_count,
+        }
+        return render(request, "marketplace/listings.html", context)
 
 
-class VendorDetail(DetailView):
-    model = Vendor
-    template_name = "marketplace/vendor_detail.html"
-    context_object_name = "vendor"
+class VendorDetail(View):
+    def get(self, request, vendor_slug):
+        vendor = get_object_or_404(Vendor, vendor_slug=vendor_slug)
 
-    def get_object(self):
-        return get_object_or_404(Vendor, vendor_slug=self.kwargs['vendor_slug'])
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Get the current vendor object
-        vendor = self.object
-        # Fetch categories and their available food items
-        context["categories"] = self.get_categories_with_fooditems(vendor)
-        # Check if the user is authenticated and get cart items if they are
-        context["cart_items"] = self.get_cart_items()
-        return context
-
-    def get_categories_with_fooditems(self, vendor):
-        return Category.objects.filter(vendor=vendor).prefetch_related(
+        # Fetch categories related to the vendor with prefetching for available food items
+        categories = Category.objects.filter(vendor=vendor).prefetch_related(
             Prefetch("fooditems", queryset=FoodItem.objects.filter(is_available=True))
         )
 
-    def get_cart_items(self):
-        if self.request.user.is_authenticated:
-            return cart_model.objects.filter(user=self.request.user)
-        return None
-    
+        if request.user.is_authenticated:
+            cart_items = cart_model.objects.filter(user=request.user)
+        else:
+            cart_items = None
 
+        context = {
+            "vendor": vendor,
+            "categories": categories,
+            "cart_items": cart_items,
+        }
+        return render(request, "marketplace/vendor_detail.html", context)
+
+    
 class AddToCart(View):
     def get(self, request, food_id):
         if not request.user.is_authenticated:
@@ -278,11 +266,9 @@ class Search(ListView):
 
         if keyword:
             vendors = vendors.filter(vendor_name__icontains=keyword)
-
         if address:
             matching_profiles = UserProfile.objects.filter(location__icontains=address)
             vendors = vendors.filter(user_profile__in=matching_profiles)
-
         return vendors
 
     def get_context_data(self, **kwargs):

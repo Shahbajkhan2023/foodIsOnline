@@ -1,4 +1,3 @@
-from django.views.generic.edit import CreateView
 from django.contrib import auth, messages
 from django.views import View
 from django.contrib.auth.views import LogoutView
@@ -6,22 +5,18 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import PermissionDenied
-from django.core.mail import message
 from django.shortcuts import redirect, render
 from django.template.defaultfilters import slugify
 from django.utils.http import urlsafe_base64_decode
 
 from vendor.forms import VendorForm
-
 from .forms import UserForm
 from .models import User, UserProfile
 from .utils import detectUser, check_role_customer, check_role_vendor
 
-from django.urls import reverse_lazy
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from django.shortcuts import render, redirect
-from django.views.generic import FormView
 from .forms import PasswordChangeForm
 from orders.models import Order
 from accounts.tasks import send_verification_email_task
@@ -58,7 +53,6 @@ class RegisterUser(View):
             send_verification_email_task.delay(user.id, mail_subject, email_template, ngrok_url)
             messages.success(request, "Your account has been registered successfully!")
             return redirect("registerUser")
-
         return render(request, self.template_name, {"form": form})
 
 
@@ -195,7 +189,10 @@ class ForgotPassword(View):
         if user:
             mail_subject = "Reset Your Password"
             email_template = "accounts/emails/reset_password_email.html"
-            send_verification_email(request, user, mail_subject, email_template)
+            ngrok_url = f"https://{request.META['HTTP_HOST']}"
+
+            # Enqueue Celery task with necessary data
+            send_verification_email_task.delay(user.id, mail_subject, email_template, ngrok_url)
 
             messages.success(request, "Password reset link has been sent to your email address.")
             return redirect("login")
