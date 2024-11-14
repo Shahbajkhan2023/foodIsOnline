@@ -1,6 +1,7 @@
 from pathlib import Path
-
 from decouple import config
+from celery.schedules import crontab
+from django.contrib.messages import constants as messages
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,7 +9,8 @@ SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
 
 
 INSTALLED_APPS = [
@@ -38,6 +40,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # custome middleware
+    "marketplace.middleware.NoConditionMatchMiddleware",
+    "accounts.middleware.UserActivityLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "foodOnline_main.urls"
@@ -72,8 +77,8 @@ DATABASES = {
         "NAME": "fooddb",
         "USER": "user",
         "PASSWORD": "123",
-        "HOST": "localhost",  # Or an IP address if the database is on a remote server
-        "PORT": "5432",  # Default PostgreSQL port
+        "HOST": "localhost",  
+        "PORT": "5432",  
     }
 }
 
@@ -117,7 +122,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-from django.contrib.messages import constants as messages
 
 MESSAGE_TAGS = {
     messages.ERROR: "danger",
@@ -137,4 +141,39 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.TokenAuthentication",
     ),
+}
+
+
+STRIPE_PUBLISHABLE_KEY=config('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY=config('STRIPE_SECRET_KEY')
+STRIPE_ENDPOINT_SECRET=config('STRIPE_ENDPOINT_SECRET') 
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+
+CELERY_BEAT_SCHEDULE = {
+    'send-vendor-reports-every-minute': {
+        'task': 'orders.tasks.send_vendor_reports',
+        'schedule': crontab(), 
+    },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'user_activity.log',  # Path to your log file
+        },
+    },
+    'loggers': {
+        'user_activity': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
 }
