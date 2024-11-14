@@ -36,10 +36,13 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    #"django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # custome middleware
+    "marketplace.middleware.NoConditionMatchMiddleware",
+    "accounts.middleware.UserActivityLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "foodOnline_main.urls"
@@ -153,5 +156,24 @@ CELERY_BEAT_SCHEDULE = {
     'send-vendor-reports-every-minute': {
         'task': 'orders.tasks.send_vendor_reports',
         'schedule': crontab(), 
+    },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'user_activity.log',  # Path to your log file
+        },
+    },
+    'loggers': {
+        'user_activity': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }

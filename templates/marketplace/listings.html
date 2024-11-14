@@ -14,6 +14,7 @@
                             <!-- Sidebar content if needed -->
                         </aside>
                         <div class="col-lg-7 col-md-7 col-sm-12 col-xs-12">
+                            
                             <!-- Search Form -->
                             <div class="search-form">
                                 <form action="{% url 'search' %}" method="GET">
@@ -37,6 +38,11 @@
                                 </form>
                             </div>
 
+                            <!-- Display a message if no search criteria are entered -->
+                            {% if no_search_message %}
+                                <p>{{ no_search_message }}</p>
+                            {% endif %}
+
                             <!-- Search Results -->
                             <div class="listing-sorting-holder">
                                 <div class="row">
@@ -45,6 +51,7 @@
                                     </div>
                                 </div>
                             </div>
+
                             <div class="listing simple">
                                 <ul>
                                     {% for vendor in vendors %}
