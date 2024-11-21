@@ -14,7 +14,7 @@ class FoodItemAdmin(admin.ModelAdmin):
     list_display = (
         "food_title",
         "category",
-        "vendor",
+        "get_vendor",
         "price",
         "is_available",
         "updated_at",
@@ -22,10 +22,17 @@ class FoodItemAdmin(admin.ModelAdmin):
     search_fields = (
         "food_title",
         "category__category_name",
-        "vendor__vendor_name",
+        "category__vendor__vendor_name",
         "price",
     )
     list_filter = ("is_available",)
+
+    # Method to display the vendor in the FoodItem list
+    def get_vendor(self, obj):
+        return obj.category.vendor.vendor_name
+
+    get_vendor.short_description = 'Vendor'  # Column name in admin
+
 
 
 admin.site.register(Category, CategoryAdmin)
